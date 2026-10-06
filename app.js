@@ -99,4 +99,26 @@ form.addEventListener("submit", function (e) {
   render();
 });
 
+// event delegation: satu listener di ul untuk semua item
+daftar.addEventListener("click", function (e) {
+  const li = e.target.parentElement; // checkbox dan tombol hapus anak langsung dari li
+  const id = Number(li.dataset.id);
+
+  if (e.target.className === "hapus") {
+    tugas = tugas.filter(function (t) {
+      return t.id !== id;
+    });
+    render();
+  }
+
+  if (e.target.type === "checkbox") {
+    for (const t of tugas) {
+      if (t.id === id) {
+        t.selesai = e.target.checked;
+      }
+    }
+    render();
+  }
+});
+
 render();
