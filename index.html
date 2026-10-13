@@ -3,25 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Task Tracker Kuliah</title>
+  <title>Task Tracker Kuliah v2</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://fuaddary.github.io/Pemrograman-Web/assets/mock-api-kampus.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <div class="app">
-    <h1>Task Tracker Kuliah</h1>
+    <h1>Task Tracker Kuliah <small>v2</small></h1>
 
     <form id="form-tugas">
       <input type="text" id="judul" placeholder="Judul tugas (min. 3 karakter)">
       <div class="baris">
-        <select id="matkul">
-          <option>Pemrograman Web</option>
-          <option>Keamanan Jaringan Komputer</option>
-          <option>Komdat Jaringan Komputer</option>
-          <option>Internet of Things</option>
-          <option>Ethical Hacking</option>
-          <option>Komunikasi Profesional</option>
-        </select>
+        <select id="matkul"></select>
         <input type="date" id="deadline">
         <button type="submit" class="tambah">Tambah</button>
       </div>

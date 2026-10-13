@@ -1,42 +1,39 @@
-// state: array of objects, diambil dari localStorage
-let tugas = JSON.parse(localStorage.getItem("tugas")) || [];
-let filter = "semua";
+// state: data dari server disimpan di sini
+const state = { tugas: [] };
 
-const form = document.getElementById("form-tugas");
-const inputJudul = document.getElementById("judul");
-const inputMatkul = document.getElementById("matkul");
-const inputDeadline = document.getElementById("deadline");
-const pesanError = document.getElementById("error");
 const daftar = document.getElementById("daftar");
 const counter = document.getElementById("counter");
-const kosong = document.getElementById("kosong");
-const tombolFilter = document.querySelectorAll(".filter button");
+const inputMatkul = document.getElementById("matkul");
 
-function simpan() {
-  localStorage.setItem("tugas", JSON.stringify(tugas));
+// helper: semua request lewat sini
+async function api(url, method, data) {
+  const opsi = { method: method || "GET" };
+
+  // kalau ada data, kirim sebagai JSON
+  if (data) {
+    opsi.headers = { "Content-Type": "application/json" };
+    opsi.body = JSON.stringify(data);
+  }
+
+  const res = await fetch(url, opsi);
+
+  // fetch tidak reject untuk 400/500, jadi kita cek res.ok sendiri
+  if (!res.ok) {
+    const isi = await res.json();
+    throw new Error(isi.error || "HTTP " + res.status);
+  }
+
+  // DELETE membalas 204 tanpa body, jadi tidak ada yang dibaca
+  if (res.status === 204) {
+    return null;
+  }
+  return res.json();
 }
 
 function render() {
   daftar.textContent = "";
 
-  // pilih tugas sesuai filter
-  let tampil = [];
-  for (const t of tugas) {
-    if (filter === "semua") {
-      tampil.push(t);
-    } else if (filter === "aktif" && !t.selesai) {
-      tampil.push(t);
-    } else if (filter === "selesai" && t.selesai) {
-      tampil.push(t);
-    }
-  }
-
-  // urutkan deadline terdekat
-  tampil.sort(function (a, b) {
-    return a.deadline.localeCompare(b.deadline);
-  });
-
-  for (const t of tampil) {
+  for (const t of state.tugas) {
     const li = document.createElement("li");
     li.dataset.id = t.id;
     if (t.selesai) {
@@ -47,8 +44,8 @@ function render() {
     cek.type = "checkbox";
     cek.checked = t.selesai;
 
-    const info = document.createElement("div");
-    info.className = "info";
+    const isi = document.createElement("div");
+    isi.className = "info";
 
     const judul = document.createElement("span");
     judul.className = "judul";
@@ -61,101 +58,41 @@ function render() {
     hapus.className = "hapus";
     hapus.textContent = "✕";
 
-    info.appendChild(judul);
-    info.appendChild(detail);
+    isi.appendChild(judul);
+    isi.appendChild(detail);
     li.appendChild(cek);
-    li.appendChild(info);
+    li.appendChild(isi);
     li.appendChild(hapus);
     daftar.appendChild(li);
   }
 
-  // counter (dari semua tugas, bukan yang difilter)
   let aktif = 0;
-  for (const t of tugas) {
+  for (const t of state.tugas) {
     if (!t.selesai) {
       aktif++;
     }
   }
   counter.textContent = aktif + " tugas aktif";
+}
 
-  // pesan kalau kosong
-  if (tampil.length === 0) {
-    kosong.textContent = "Belum ada tugas.";
-  } else {
-    kosong.textContent = "";
+// isi <select> dari daftar matkul server
+function isiMatkul(daftarMatkul) {
+  inputMatkul.textContent = "";
+  for (const m of daftarMatkul) {
+    const opsi = document.createElement("option");
+    opsi.value = m.nama;
+    opsi.textContent = m.nama;
+    inputMatkul.appendChild(opsi);
   }
 }
 
-// form tambah tugas
-form.addEventListener("submit", function (e) {
-  e.preventDefault();
+async function muat() {
+  // dua request jalan bersamaan (paralel), bukan satu-satu
+  const hasil = await Promise.all([api("/api/tugas"), api("/api/matkul")]);
 
-  const judul = inputJudul.value.trim();
-  const matkul = inputMatkul.value;
-  const deadline = inputDeadline.value;
-
-  if (judul.length < 3) {
-    pesanError.textContent = "Judul minimal 3 karakter.";
-    return;
-  }
-  if (deadline === "") {
-    pesanError.textContent = "Deadline wajib diisi.";
-    return;
-  }
-
-  pesanError.textContent = "";
-
-  tugas.push({
-    id: Date.now(),
-    judul: judul,
-    matkul: matkul,
-    deadline: deadline,
-    selesai: false,
-  });
-
-  inputJudul.value = "";
-  inputDeadline.value = "";
-
-  simpan();
+  state.tugas = hasil[0]; // hasil pertama = tugas
+  isiMatkul(hasil[1]); // hasil kedua = matkul
   render();
-});
-
-// event delegation: satu listener di ul untuk semua item
-daftar.addEventListener("click", function (e) {
-  const li = e.target.parentElement;
-  const id = Number(li.dataset.id);
-
-  if (e.target.className === "hapus") {
-    tugas = tugas.filter(function (t) {
-      return t.id !== id;
-    });
-    simpan();
-    render();
-  }
-
-  if (e.target.type === "checkbox") {
-    for (const t of tugas) {
-      if (t.id === id) {
-        t.selesai = e.target.checked;
-      }
-    }
-    simpan();
-    render();
-  }
-});
-
-// filter Semua / Aktif / Selesai
-for (const tombol of tombolFilter) {
-  tombol.addEventListener("click", function () {
-    filter = tombol.dataset.filter;
-
-    for (const b of tombolFilter) {
-      b.classList.remove("on");
-    }
-    tombol.classList.add("on");
-
-    render();
-  });
 }
 
-render();
+muat();
