@@ -22,13 +22,21 @@ async function api(url, method, data) {
     opsi.body = JSON.stringify(data);
   }
 
-  const res = await fetch(url, opsi);
+  // error jaringan (offline): fetch langsung reject
+  let res;
+  try {
+    res = await fetch(url, opsi);
+  } catch (err) {
+    throw new Error("Tidak dapat terhubung ke server");
+  }
 
+  // error HTTP (400, 404, 500): fetch tidak reject, jadi cek res.ok
   if (!res.ok) {
     const isi = await res.json();
     throw new Error(isi.error || "HTTP " + res.status);
   }
 
+  // DELETE membalas 204 tanpa body
   if (res.status === 204) {
     return null;
   }
@@ -149,6 +157,12 @@ async function muat() {
 form.addEventListener("submit", async function (e) {
   e.preventDefault();
 
+  // guard: jangan kirim kalau data awal belum berhasil dimuat
+  if (state.status !== "success") {
+    pesanError.textContent = "Data belum termuat dari server.";
+    return;
+  }
+
   const judul = inputJudul.value.trim();
   const matkul = inputMatkul.value;
   const deadline = inputDeadline.value;
@@ -188,17 +202,15 @@ form.addEventListener("submit", async function (e) {
 
 // event delegation: satu listener di ul, PATCH (selesai) dan DELETE (hapus)
 daftar.addEventListener("click", async function (e) {
-  const li = e.target.parentElement; // checkbox dan tombol hapus anak langsung dari li
+  const li = e.target.parentElement;
   const id = Number(li.dataset.id);
   const hapus = e.target.className === "hapus";
   const centang = e.target.type === "checkbox";
 
-  // klik di tempat lain diabaikan
   if (!hapus && !centang) {
     return;
   }
 
-  // tandai item sedang diproses
   li.classList.add("proses");
   pesanError.textContent = "";
 
@@ -213,7 +225,6 @@ daftar.addEventListener("click", async function (e) {
         selesai: e.target.checked,
       });
 
-      // ganti item lama dengan objek terbaru dari server
       for (let i = 0; i < state.tugas.length; i++) {
         if (state.tugas[i].id === id) {
           state.tugas[i] = baru;
@@ -224,7 +235,6 @@ daftar.addEventListener("click", async function (e) {
     pesanError.textContent = "Gagal memperbarui: " + err.message;
   }
 
-  // render ulang: sukses atau gagal, tampilan kembali sesuai state
   render();
 });
 
