@@ -1,15 +1,17 @@
-// state: data dari server disimpan di sini
-const state = { tugas: [] };
+// state: status = "loading" | "error" | "success"
+const state = { status: "loading", tugas: [], error: "", filter: "semua" };
 
 const daftar = document.getElementById("daftar");
 const counter = document.getElementById("counter");
+const kosong = document.getElementById("kosong");
+const info = document.getElementById("info");
 const inputMatkul = document.getElementById("matkul");
+const tombolFilter = document.querySelectorAll(".filter button");
 
 // helper: semua request lewat sini
 async function api(url, method, data) {
   const opsi = { method: method || "GET" };
 
-  // kalau ada data, kirim sebagai JSON
   if (data) {
     opsi.headers = { "Content-Type": "application/json" };
     opsi.body = JSON.stringify(data);
@@ -17,13 +19,11 @@ async function api(url, method, data) {
 
   const res = await fetch(url, opsi);
 
-  // fetch tidak reject untuk 400/500, jadi kita cek res.ok sendiri
   if (!res.ok) {
     const isi = await res.json();
     throw new Error(isi.error || "HTTP " + res.status);
   }
 
-  // DELETE membalas 204 tanpa body, jadi tidak ada yang dibaca
   if (res.status === 204) {
     return null;
   }
@@ -32,8 +32,45 @@ async function api(url, method, data) {
 
 function render() {
   daftar.textContent = "";
+  kosong.textContent = "";
+  info.textContent = "";
+  info.className = "";
+  counter.textContent = "";
 
+  // state loading
+  if (state.status === "loading") {
+    info.textContent = "Memuat tugas dari server...";
+    return;
+  }
+
+  // state error + tombol coba lagi
+  if (state.status === "error") {
+    info.className = "gagal";
+    info.textContent = "Gagal memuat: " + state.error;
+
+    const ulang = document.createElement("button");
+    ulang.id = "ulang";
+    ulang.textContent = "Coba lagi";
+    info.appendChild(ulang);
+    return;
+  }
+
+  // state success: filter lalu urutkan deadline terdekat
+  const tampil = [];
   for (const t of state.tugas) {
+    if (state.filter === "semua") {
+      tampil.push(t);
+    } else if (state.filter === "aktif" && !t.selesai) {
+      tampil.push(t);
+    } else if (state.filter === "selesai" && t.selesai) {
+      tampil.push(t);
+    }
+  }
+  tampil.sort(function (a, b) {
+    return a.deadline.localeCompare(b.deadline);
+  });
+
+  for (const t of tampil) {
     const li = document.createElement("li");
     li.dataset.id = t.id;
     if (t.selesai) {
@@ -66,6 +103,7 @@ function render() {
     daftar.appendChild(li);
   }
 
+  // counter dihitung dari semua tugas, bukan yang difilter
   let aktif = 0;
   for (const t of state.tugas) {
     if (!t.selesai) {
@@ -73,9 +111,13 @@ function render() {
     }
   }
   counter.textContent = aktif + " tugas aktif";
+
+  // state kosong
+  if (tampil.length === 0) {
+    kosong.textContent = "Belum ada tugas.";
+  }
 }
 
-// isi <select> dari daftar matkul server
 function isiMatkul(daftarMatkul) {
   inputMatkul.textContent = "";
   for (const m of daftarMatkul) {
@@ -87,12 +129,41 @@ function isiMatkul(daftarMatkul) {
 }
 
 async function muat() {
-  // dua request jalan bersamaan (paralel), bukan satu-satu
-  const hasil = await Promise.all([api("/api/tugas"), api("/api/matkul")]);
-
-  state.tugas = hasil[0]; // hasil pertama = tugas
-  isiMatkul(hasil[1]); // hasil kedua = matkul
+  state.status = "loading";
   render();
+
+  try {
+    const hasil = await Promise.all([api("/api/tugas"), api("/api/matkul")]);
+    state.tugas = hasil[0];
+    isiMatkul(hasil[1]);
+    state.status = "success";
+  } catch (err) {
+    state.status = "error";
+    state.error = err.message;
+  }
+
+  render();
+}
+
+// tombol coba lagi dibuat lewat JS, jadi pakai delegation di #info
+info.addEventListener("click", function (e) {
+  if (e.target.id === "ulang") {
+    muat();
+  }
+});
+
+// filter Semua / Aktif / Selesai
+for (const tombol of tombolFilter) {
+  tombol.addEventListener("click", function () {
+    state.filter = tombol.dataset.filter;
+
+    for (const b of tombolFilter) {
+      b.classList.remove("on");
+    }
+    tombol.classList.add("on");
+
+    render();
+  });
 }
 
 muat();

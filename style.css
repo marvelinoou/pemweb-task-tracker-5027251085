@@ -137,3 +137,19 @@ li.selesai .judul {
   text-align: center;
   color: #8a97a8;
 }
+
+#info {
+  margin: 8px 0;
+  text-align: center;
+  color: #5b6b7f;
+}
+
+#info.gagal {
+  color: #c0392b;
+}
+
+#info button {
+  margin-left: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
