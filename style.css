@@ -153,3 +153,8 @@ li.selesai .judul {
   padding: 4px 10px;
   cursor: pointer;
 }
+
+li.proses {
+  opacity: 0.45;
+  pointer-events: none;
+}

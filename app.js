@@ -1,11 +1,16 @@
 // state: status = "loading" | "error" | "success"
 const state = { status: "loading", tugas: [], error: "", filter: "semua" };
 
+const form = document.getElementById("form-tugas");
+const inputJudul = document.getElementById("judul");
+const inputMatkul = document.getElementById("matkul");
+const inputDeadline = document.getElementById("deadline");
+const pesanError = document.getElementById("error");
+const tombolTambah = document.querySelector(".tambah");
 const daftar = document.getElementById("daftar");
 const counter = document.getElementById("counter");
 const kosong = document.getElementById("kosong");
 const info = document.getElementById("info");
-const inputMatkul = document.getElementById("matkul");
 const tombolFilter = document.querySelectorAll(".filter button");
 
 // helper: semua request lewat sini
@@ -37,13 +42,11 @@ function render() {
   info.className = "";
   counter.textContent = "";
 
-  // state loading
   if (state.status === "loading") {
     info.textContent = "Memuat tugas dari server...";
     return;
   }
 
-  // state error + tombol coba lagi
   if (state.status === "error") {
     info.className = "gagal";
     info.textContent = "Gagal memuat: " + state.error;
@@ -55,7 +58,6 @@ function render() {
     return;
   }
 
-  // state success: filter lalu urutkan deadline terdekat
   const tampil = [];
   for (const t of state.tugas) {
     if (state.filter === "semua") {
@@ -103,7 +105,6 @@ function render() {
     daftar.appendChild(li);
   }
 
-  // counter dihitung dari semua tugas, bukan yang difilter
   let aktif = 0;
   for (const t of state.tugas) {
     if (!t.selesai) {
@@ -112,7 +113,6 @@ function render() {
   }
   counter.textContent = aktif + " tugas aktif";
 
-  // state kosong
   if (tampil.length === 0) {
     kosong.textContent = "Belum ada tugas.";
   }
@@ -145,14 +145,95 @@ async function muat() {
   render();
 }
 
-// tombol coba lagi dibuat lewat JS, jadi pakai delegation di #info
+// form tambah tugas: POST ke server
+form.addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const judul = inputJudul.value.trim();
+  const matkul = inputMatkul.value;
+  const deadline = inputDeadline.value;
+
+  if (judul.length < 3) {
+    pesanError.textContent = "Judul minimal 3 karakter.";
+    return;
+  }
+  if (deadline === "") {
+    pesanError.textContent = "Deadline wajib diisi.";
+    return;
+  }
+
+  pesanError.textContent = "";
+
+  tombolTambah.disabled = true;
+  tombolTambah.textContent = "Menyimpan...";
+
+  try {
+    const baru = await api("/api/tugas", "POST", {
+      judul: judul,
+      matkul: matkul,
+      deadline: deadline,
+    });
+
+    state.tugas.push(baru);
+    inputJudul.value = "";
+    inputDeadline.value = "";
+    render();
+  } catch (err) {
+    pesanError.textContent = "Gagal menyimpan: " + err.message;
+  } finally {
+    tombolTambah.disabled = false;
+    tombolTambah.textContent = "Tambah";
+  }
+});
+
+// event delegation: satu listener di ul, PATCH (selesai) dan DELETE (hapus)
+daftar.addEventListener("click", async function (e) {
+  const li = e.target.parentElement; // checkbox dan tombol hapus anak langsung dari li
+  const id = Number(li.dataset.id);
+  const hapus = e.target.className === "hapus";
+  const centang = e.target.type === "checkbox";
+
+  // klik di tempat lain diabaikan
+  if (!hapus && !centang) {
+    return;
+  }
+
+  // tandai item sedang diproses
+  li.classList.add("proses");
+  pesanError.textContent = "";
+
+  try {
+    if (hapus) {
+      await api("/api/tugas/" + id, "DELETE");
+      state.tugas = state.tugas.filter(function (t) {
+        return t.id !== id;
+      });
+    } else {
+      const baru = await api("/api/tugas/" + id, "PATCH", {
+        selesai: e.target.checked,
+      });
+
+      // ganti item lama dengan objek terbaru dari server
+      for (let i = 0; i < state.tugas.length; i++) {
+        if (state.tugas[i].id === id) {
+          state.tugas[i] = baru;
+        }
+      }
+    }
+  } catch (err) {
+    pesanError.textContent = "Gagal memperbarui: " + err.message;
+  }
+
+  // render ulang: sukses atau gagal, tampilan kembali sesuai state
+  render();
+});
+
 info.addEventListener("click", function (e) {
   if (e.target.id === "ulang") {
     muat();
   }
 });
 
-// filter Semua / Aktif / Selesai
 for (const tombol of tombolFilter) {
   tombol.addEventListener("click", function () {
     state.filter = tombol.dataset.filter;
